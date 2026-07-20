@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: urlshortener
+      POSTGRES_USER: aurora
+      POSTGRES_PASSWORD: password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  web:
+    build: .
+    ports:
+      - "5001:5001"
+    environment:
+      DB_HOST: db
+      DB_NAME: urlshortener
+      DB_USER: aurora
+      DB_PASSWORD: password
+      BASE_URL: http://13.201.5.197
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
