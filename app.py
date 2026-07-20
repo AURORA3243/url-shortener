@@ -84,7 +84,7 @@ HTML = """
     <script>
         async function shorten() {
             const url = document.getElementById('url').value;
-            const res = await fetch('/api/shorten', {
+            const res = await fetch('/short/api/shorten', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({url: url})
@@ -101,7 +101,7 @@ HTML = """
         }
 
         async function loadUrls() {
-            const res = await fetch('/api/urls');
+            const res = await fetch('/short/api/urls');
             const data = await res.json();
             const table = document.getElementById('urls-table');
             table.innerHTML = '<tr><th>Short Code</th><th>Original URL</th><th>Clicks</th><th>Created</th></tr>';
@@ -117,10 +117,12 @@ HTML = """
 """
 
 @app.route("/")
+@app.route("/short")
 def home():
     return render_template_string(HTML)
 
 @app.route("/api/shorten", methods=["POST"])
+@app.route("/short/api/shorten", methods=["POST"])
 def shorten():
     data = request.get_json()
     if not data or "url" not in data:
@@ -144,13 +146,14 @@ def shorten():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    base_url = os.environ.get("BASE_URL", "http://13.201.5.197")
+    base_url = os.environ.get("BASE_URL", "http://localhost:5001")
     return jsonify({
         "short_url": f"{base_url}/s/{short_code}",
         "short_code": short_code
     })
 
 @app.route("/api/urls")
+@app.route("/short/api/urls")
 def list_urls():
     try:
         conn = get_db()
@@ -177,7 +180,23 @@ def list_urls():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/s/<short_code>")
+def redirect_url(short_code):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT original_url FROM urls WHERE short_code = %s", (short_code,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "URL not found"}), 404
+        cur.execute("UPDATE urls SET clicks = clicks + 1 WHERE short_code = %s", (short_code,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return redirect(row[0])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     init_db()
     app.run(host="0.0.0.0", port=5001)
-EOF
